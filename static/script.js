@@ -22,13 +22,28 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeEventListeners() {
     // File input events
     fileInput.addEventListener('change', handleFileSelect);
-    browseBtn.addEventListener('click', handleBrowseClick);
+    
+    // Simple click handler for browse button
+    if (browseBtn) {
+        browseBtn.addEventListener('click', function(e) {
+            console.log('Browse button clicked!');
+            e.preventDefault();
+            e.stopPropagation();
+            fileInput.click();
+        });
+    }
+    
+    // Simple click handler for upload area
+    uploadArea.addEventListener('click', function(e) {
+        console.log('Upload area clicked!', e.target);
+        // Always trigger file input when clicking upload area
+        fileInput.click();
+    });
     
     // Drag and drop events
     uploadArea.addEventListener('dragover', handleDragOver);
     uploadArea.addEventListener('dragleave', handleDragLeave);
     uploadArea.addEventListener('drop', handleFileDrop);
-    uploadArea.addEventListener('click', handleUploadAreaClick);
     
     // Button events
     newUploadBtn.addEventListener('click', resetToUpload);
@@ -46,25 +61,7 @@ function preventDefault(e) {
     e.stopPropagation();
 }
 
-function handleBrowseClick(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    fileInput.click();
-}
-
-function handleUploadAreaClick(e) {
-    // Don't trigger if the browse text or its children were clicked
-    if (e.target.classList.contains('browse-text') || 
-        e.target.closest('.browse-text') || 
-        e.target.id === 'browseBtn') {
-        return; // Let the browse button handler deal with it
-    }
-    
-    // Trigger file input for all other areas
-    e.preventDefault();
-    e.stopPropagation();
-    fileInput.click();
-}
+// Removed complex event handlers - using simple inline handlers instead
 
 function handleDragOver(e) {
     e.preventDefault();
@@ -162,10 +159,15 @@ function resetUploadArea() {
     
     uploadArea.parentElement.classList.remove('file-selected', 'upload-error');
     
-    // Re-attach browse button event (remove old listener first to prevent duplicates)
+    // Re-attach browse button event
     const newBrowseBtn = document.getElementById('browseBtn');
-    newBrowseBtn.removeEventListener('click', handleBrowseClick);
-    newBrowseBtn.addEventListener('click', handleBrowseClick);
+    if (newBrowseBtn) {
+        newBrowseBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            fileInput.click();
+        });
+    }
 }
 
 function startProcessing() {
