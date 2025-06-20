@@ -53,12 +53,17 @@ function handleBrowseClick(e) {
 }
 
 function handleUploadAreaClick(e) {
-    // Only trigger file input if not clicking on the browse text
-    if (!e.target.closest('#browseBtn')) {
-        e.preventDefault();
-        e.stopPropagation();
-        fileInput.click();
+    // Don't trigger if the browse text or its children were clicked
+    if (e.target.classList.contains('browse-text') || 
+        e.target.closest('.browse-text') || 
+        e.target.id === 'browseBtn') {
+        return; // Let the browse button handler deal with it
     }
+    
+    // Trigger file input for all other areas
+    e.preventDefault();
+    e.stopPropagation();
+    fileInput.click();
 }
 
 function handleDragOver(e) {
