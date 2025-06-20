@@ -79,21 +79,30 @@ async def extract_pdf_data(
                 if text:
                     full_text += text + "\n"
         
-        # For now, return basic extraction results
-        # In production, you would integrate with OpenAI here
+        # Use OpenAI for intelligent analysis
+        from app.services.openai_service import OpenAIService
+        import time
+        
+        start_time = time.time()
+        ai_service = OpenAIService()
+        
+        # Get AI analysis
+        structured_data = await ai_service.analyze_pdf_content(full_text, extraction_type)
+        ai_summary = await ai_service.generate_summary(full_text, extraction_type)
+        entities = await ai_service.extract_entities(full_text)
+        
+        processing_time = f"{time.time() - start_time:.1f} seconds"
+        
         results = {
             "filename": file.filename,
             "file_size": len(content),
             "extraction_type": extraction_type,
             "page_count": len(pdf.pages) if 'pdf' in locals() else 1,
-            "processing_time": "1.2 seconds",
-            "structured_data": {
-                "document_type": f"{extraction_type.title()} Document",
-                "text_length": len(full_text),
-                "extraction_method": "pdfplumber + AI"
-            },
-            "raw_text": full_text[:2000] + "..." if len(full_text) > 2000 else full_text,
-            "ai_summary": f"This appears to be a {extraction_type} document with {len(full_text)} characters of text extracted successfully."
+            "processing_time": processing_time,
+            "structured_data": structured_data,
+            "raw_text": full_text[:3000] + "..." if len(full_text) > 3000 else full_text,
+            "ai_summary": ai_summary,
+            "extracted_entities": entities
         }
         
         return results
