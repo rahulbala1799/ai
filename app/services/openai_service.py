@@ -20,7 +20,7 @@ class OpenAIService:
         
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": f"Please analyze this document:\n\n{raw_text}"}
@@ -47,7 +47,7 @@ class OpenAIService:
         
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-3.5-turbo",
                 messages=[
                     {
                         "role": "system", 
@@ -72,7 +72,7 @@ class OpenAIService:
         
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-3.5-turbo",
                 messages=[
                     {
                         "role": "system",
