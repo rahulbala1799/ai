@@ -7,7 +7,7 @@ python-multipart==0.0.6
 pdfplumber==0.10.3
 
 # AI and OpenAI
-openai==1.3.6
+openai==1.89.0
 
 # Database (for Railway PostgreSQL)
 sqlalchemy==2.0.23
