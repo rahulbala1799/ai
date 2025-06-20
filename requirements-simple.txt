@@ -1,0 +1,22 @@
+# FastAPI and server dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# PDF processing (simplified - we'll add PyMuPDF later)
+pdfplumber==0.10.3
+
+# AI and OpenAI
+openai==1.3.6
+
+# Database
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+
+# Utilities
+python-dotenv==1.0.0
+pydantic==2.5.0
+httpx==0.25.2
+
+# File handling
+aiofiles==23.2.1 
