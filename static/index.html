@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI PDF Data Extraction</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-file-pdf"></i>
+                    <h1>AI PDF Extractor</h1>
+                </div>
+                <p class="subtitle">Extract, analyze, and structure data from PDFs using AI</p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Upload Section -->
+            <section class="upload-section" id="uploadSection">
+                <div class="upload-card">
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-icon">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                        </div>
+                        <h3>Drop your PDF here</h3>
+                        <p>or <span class="browse-text" id="browseBtn">browse to choose a file</span></p>
+                        <input type="file" id="fileInput" accept=".pdf" hidden>
+                        <div class="file-info">
+                            <small>Maximum file size: 50MB</small>
+                        </div>
+                    </div>
+                    
+                    <div class="upload-options">
+                        <div class="extraction-type">
+                            <h4>Extraction Type</h4>
+                            <div class="radio-group">
+                                <label class="radio-option">
+                                    <input type="radio" name="extractionType" value="general" checked>
+                                    <span class="radio-custom"></span>
+                                    <div>
+                                        <strong>General Extraction</strong>
+                                        <small>Extract all text and basic structure</small>
+                                    </div>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="extractionType" value="invoice">
+                                    <span class="radio-custom"></span>
+                                    <div>
+                                        <strong>Invoice Processing</strong>
+                                        <small>Extract invoice details, amounts, dates</small>
+                                    </div>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="extractionType" value="contract">
+                                    <span class="radio-custom"></span>
+                                    <div>
+                                        <strong>Contract Analysis</strong>
+                                        <small>Extract key terms, dates, parties</small>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Processing Section -->
+            <section class="processing-section" id="processingSection" style="display: none;">
+                <div class="processing-card">
+                    <div class="processing-animation">
+                        <div class="spinner"></div>
+                    </div>
+                    <h3>Processing your PDF...</h3>
+                    <p>AI is analyzing and extracting data from your document</p>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="processing-steps">
+                        <div class="step active" id="step1">
+                            <i class="fas fa-upload"></i>
+                            <span>Uploading</span>
+                        </div>
+                        <div class="step" id="step2">
+                            <i class="fas fa-search"></i>
+                            <span>Analyzing</span>
+                        </div>
+                        <div class="step" id="step3">
+                            <i class="fas fa-brain"></i>
+                            <span>AI Processing</span>
+                        </div>
+                        <div class="step" id="step4">
+                            <i class="fas fa-check"></i>
+                            <span>Complete</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" id="resultsSection" style="display: none;">
+                <div class="results-header">
+                    <h2>Extraction Results</h2>
+                    <div class="results-actions">
+                        <button class="btn btn-secondary" id="newUploadBtn">
+                            <i class="fas fa-plus"></i>
+                            New Upload
+                        </button>
+                        <button class="btn btn-primary" id="downloadBtn">
+                            <i class="fas fa-download"></i>
+                            Download JSON
+                        </button>
+                    </div>
+                </div>
+
+                <div class="results-content">
+                    <div class="results-tabs">
+                        <button class="tab-btn active" data-tab="structured">Structured Data</button>
+                        <button class="tab-btn" data-tab="raw">Raw Text</button>
+                        <button class="tab-btn" data-tab="summary">AI Summary</button>
+                    </div>
+
+                    <div class="tab-content active" id="structured-tab">
+                        <div class="structured-data" id="structuredData">
+                            <!-- Results will be populated here -->
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="raw-tab">
+                        <div class="raw-text" id="rawText">
+                            <!-- Raw text will be populated here -->
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="summary-tab">
+                        <div class="ai-summary" id="aiSummary">
+                            <!-- AI summary will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>&copy; 2024 AI PDF Extractor. Powered by OpenAI and FastAPI.</p>
+        </footer>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html> 
