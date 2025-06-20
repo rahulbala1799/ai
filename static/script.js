@@ -22,13 +22,13 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeEventListeners() {
     // File input events
     fileInput.addEventListener('change', handleFileSelect);
-    browseBtn.addEventListener('click', () => fileInput.click());
+    browseBtn.addEventListener('click', handleBrowseClick);
     
     // Drag and drop events
     uploadArea.addEventListener('dragover', handleDragOver);
     uploadArea.addEventListener('dragleave', handleDragLeave);
     uploadArea.addEventListener('drop', handleFileDrop);
-    uploadArea.addEventListener('click', () => fileInput.click());
+    uploadArea.addEventListener('click', handleUploadAreaClick);
     
     // Button events
     newUploadBtn.addEventListener('click', resetToUpload);
@@ -44,6 +44,21 @@ function initializeEventListeners() {
 function preventDefault(e) {
     e.preventDefault();
     e.stopPropagation();
+}
+
+function handleBrowseClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    fileInput.click();
+}
+
+function handleUploadAreaClick(e) {
+    // Only trigger file input if not clicking on the browse text
+    if (!e.target.closest('#browseBtn')) {
+        e.preventDefault();
+        e.stopPropagation();
+        fileInput.click();
+    }
 }
 
 function handleDragOver(e) {
@@ -142,9 +157,10 @@ function resetUploadArea() {
     
     uploadArea.parentElement.classList.remove('file-selected', 'upload-error');
     
-    // Re-attach browse button event
+    // Re-attach browse button event (remove old listener first to prevent duplicates)
     const newBrowseBtn = document.getElementById('browseBtn');
-    newBrowseBtn.addEventListener('click', () => fileInput.click());
+    newBrowseBtn.removeEventListener('click', handleBrowseClick);
+    newBrowseBtn.addEventListener('click', handleBrowseClick);
 }
 
 function startProcessing() {
