@@ -1,7 +1,7 @@
 import os
 from openai import OpenAI
 import json
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 class OpenAIService:
     def __init__(self):
@@ -100,6 +100,116 @@ class OpenAIService:
                 
         except Exception as e:
             return {"error": f"Entity extraction failed: {str(e)}"}
+    
+    async def extract_invoice_for_excel(self, raw_text: str, filename: str) -> Dict[str, Any]:
+        """Extract invoice data specifically formatted for Excel export with line items"""
+        
+        try:
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": self._get_excel_invoice_prompt()},
+                    {"role": "user", "content": f"Extract data from this invoice file '{filename}':\n\n{raw_text}"}
+                ],
+                max_tokens=2000,
+                temperature=0.1
+            )
+            
+            content = response.choices[0].message.content or ""
+            
+            try:
+                structured_data = json.loads(content)
+                # Ensure we have the required structure
+                if not isinstance(structured_data, dict):
+                    return self._get_fallback_invoice_structure(filename)
+                
+                # Add filename to each record
+                if 'invoice_summary' in structured_data:
+                    structured_data['invoice_summary']['filename'] = filename
+                
+                if 'line_items' in structured_data:
+                    for item in structured_data['line_items']:
+                        item['filename'] = filename
+                
+                return structured_data
+                
+            except json.JSONDecodeError:
+                return self._get_fallback_invoice_structure(filename)
+            
+        except Exception as e:
+            return {
+                "error": f"OpenAI API error: {str(e)}",
+                "invoice_summary": self._get_empty_invoice_summary(filename),
+                "line_items": []
+            }
+    
+    def _get_excel_invoice_prompt(self) -> str:
+        return """You are an expert invoice processor. Extract invoice data in this EXACT JSON format for Excel export:
+        {
+            "invoice_summary": {
+                "invoice_number": "invoice number or 'N/A'",
+                "vendor_name": "vendor company name",
+                "invoice_date": "YYYY-MM-DD format or 'N/A'",
+                "due_date": "YYYY-MM-DD format or 'N/A'",
+                "subtotal": "numeric value only, no currency symbols",
+                "tax_amount": "numeric value only, no currency symbols", 
+                "total_amount": "numeric value only, no currency symbols",
+                "po_number": "purchase order number or 'N/A'",
+                "vendor_address": "full vendor address or 'N/A'",
+                "currency": "USD, EUR, etc. or 'USD'",
+                "payment_terms": "payment terms or 'N/A'"
+            },
+            "line_items": [
+                {
+                    "item_description": "description of item/service",
+                    "quantity": "numeric quantity or 1",
+                    "unit_price": "numeric price without currency",
+                    "line_total": "numeric total without currency",
+                    "category": "expense category like 'Office Supplies', 'Professional Services', etc."
+                }
+            ]
+        }
+        
+        CRITICAL RULES:
+        - Return ONLY valid JSON, no explanations
+        - All numeric values must be numbers, not strings
+        - Use "N/A" for missing text fields
+        - Use 0 for missing numeric fields
+        - Dates must be YYYY-MM-DD format
+        - Extract ALL line items, even if partially visible
+        - Categorize items professionally (Office Supplies, Professional Services, Equipment, etc.)
+        - If no line items visible, create one line item with the total amount"""
+    
+    def _get_fallback_invoice_structure(self, filename: str) -> Dict[str, Any]:
+        """Fallback structure when AI parsing fails"""
+        return {
+            "invoice_summary": self._get_empty_invoice_summary(filename),
+            "line_items": [{
+                "item_description": "Unable to extract line items",
+                "quantity": 1,
+                "unit_price": 0,
+                "line_total": 0,
+                "category": "Unknown"
+            }],
+            "extraction_note": "Partial extraction - please review"
+        }
+    
+    def _get_empty_invoice_summary(self, filename: str) -> Dict[str, Any]:
+        """Empty invoice summary structure"""
+        return {
+            "invoice_number": "N/A",
+            "vendor_name": "Unknown Vendor",
+            "invoice_date": "N/A",
+            "due_date": "N/A", 
+            "subtotal": 0,
+            "tax_amount": 0,
+            "total_amount": 0,
+            "po_number": "N/A",
+            "vendor_address": "N/A",
+            "currency": "USD",
+            "payment_terms": "N/A",
+            "filename": filename
+        }
     
     def _get_general_prompt(self) -> str:
         return """You are an expert document analyst. Analyze the document and extract key information in JSON format:

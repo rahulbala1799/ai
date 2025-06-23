@@ -17,4 +17,9 @@ psycopg2-binary==2.9.9
 python-dotenv==1.0.0
 
 # File handling
-aiofiles==23.2.1 
+aiofiles==23.2.1
+
+# Excel export and data processing
+pandas>=2.2.0
+openpyxl==3.1.2
+xlsxwriter==3.1.9 

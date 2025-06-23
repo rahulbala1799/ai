@@ -1,8 +1,12 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse
+from typing import List
 import os
 from dotenv import load_dotenv
+import io
+import asyncio
 
 # Load environment variables
 load_dotenv()
@@ -52,7 +56,98 @@ async def api_info():
         "docs": "/docs"
     }
 
-# PDF extraction endpoint
+# Batch PDF processing endpoint - NEW
+@app.post("/api/v1/batch-extract")
+async def batch_extract_invoices(files: List[UploadFile] = File(...)):
+    """Process multiple PDF invoices for Excel export"""
+    try:
+        if len(files) > 50:  # Limit batch size
+            raise HTTPException(status_code=400, detail="Maximum 50 files allowed per batch")
+        
+        # Validate all files are PDFs
+        for file in files:
+            if file.content_type != "application/pdf":
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"File {file.filename} is not a PDF. Only PDF files are allowed."
+                )
+        
+        from app.services.openai_service import OpenAIService
+        ai_service = OpenAIService()
+        
+        # Process all PDFs
+        processed_invoices = []
+        
+        for file in files:
+            try:
+                # Read file content
+                content = await file.read()
+                
+                # Extract text with pdfplumber
+                import pdfplumber
+                with pdfplumber.open(io.BytesIO(content)) as pdf:
+                    full_text = ""
+                    for page in pdf.pages:
+                        text = page.extract_text()
+                        if text:
+                            full_text += text + "\n"
+                
+                # Extract structured invoice data for Excel
+                filename = file.filename or "unknown_file.pdf"
+                invoice_data = await ai_service.extract_invoice_for_excel(full_text, filename)
+                processed_invoices.append(invoice_data)
+                
+            except Exception as e:
+                # Add error record for failed files
+                filename = file.filename or "unknown_file.pdf"
+                processed_invoices.append({
+                    "error": f"Failed to process {filename}: {str(e)}",
+                    "invoice_summary": ai_service._get_empty_invoice_summary(filename),
+                    "line_items": []
+                })
+        
+        return {
+            "status": "success",
+            "processed_count": len(processed_invoices),
+            "invoices": processed_invoices,
+            "message": f"Successfully processed {len(processed_invoices)} invoice(s)"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Batch processing error: {str(e)}")
+
+# Excel export endpoint - NEW
+@app.post("/api/v1/export-excel")
+async def export_to_excel(invoice_data: dict):
+    """Export processed invoice data to Excel format"""
+    try:
+        from app.services.excel_service import ExcelService
+        
+        excel_service = ExcelService()
+        invoice_list = invoice_data.get('invoices', [])
+        
+        if not invoice_list:
+            raise HTTPException(status_code=400, detail="No invoice data provided")
+        
+        # Generate Excel file
+        excel_bytes = excel_service.create_excel_from_invoices(invoice_list)
+        
+        # Create filename with timestamp
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"invoice_batch_{timestamp}.xlsx"
+        
+        # Return Excel file as download
+        return StreamingResponse(
+            io.BytesIO(excel_bytes),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Excel export error: {str(e)}")
+
+# PDF extraction endpoint (keep existing for compatibility)
 @app.post("/api/v1/extract")
 async def extract_pdf_data(
     file: UploadFile = File(...),
@@ -69,7 +164,6 @@ async def extract_pdf_data(
         
         # Process PDF with pdfplumber
         import pdfplumber
-        import io
         
         with pdfplumber.open(io.BytesIO(content)) as pdf:
             # Extract text from all pages

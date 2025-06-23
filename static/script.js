@@ -5,13 +5,16 @@ const browseBtn = document.getElementById('browseBtn');
 const uploadSection = document.getElementById('uploadSection');
 const processingSection = document.getElementById('processingSection');
 const resultsSection = document.getElementById('resultsSection');
-const progressFill = document.getElementById('progressFill');
-const newUploadBtn = document.getElementById('newUploadBtn');
-const downloadBtn = document.getElementById('downloadBtn');
+const fileList = document.getElementById('fileList');
+const fileItems = document.getElementById('fileItems');
+const clearFilesBtn = document.getElementById('clearFilesBtn');
+const processFilesBtn = document.getElementById('processFilesBtn');
+const newBatchBtn = document.getElementById('newBatchBtn');
+const exportExcelBtn = document.getElementById('exportExcelBtn');
 
 // Global variables
-let currentFile = null;
-let extractionResults = null;
+let selectedFiles = [];
+let processedData = null;
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
@@ -23,21 +26,20 @@ function initializeEventListeners() {
     // File input events
     fileInput.addEventListener('change', handleFileSelect);
     
-    // Simple click handler for browse button
+    // Browse button
     if (browseBtn) {
         browseBtn.addEventListener('click', function(e) {
-            console.log('Browse button clicked!');
             e.preventDefault();
             e.stopPropagation();
             fileInput.click();
         });
     }
     
-    // Simple click handler for upload area
+    // Upload area click
     uploadArea.addEventListener('click', function(e) {
-        console.log('Upload area clicked!', e.target);
-        // Always trigger file input when clicking upload area
-        fileInput.click();
+        if (selectedFiles.length === 0) {
+            fileInput.click();
+        }
     });
     
     // Drag and drop events
@@ -46,8 +48,10 @@ function initializeEventListeners() {
     uploadArea.addEventListener('drop', handleFileDrop);
     
     // Button events
-    newUploadBtn.addEventListener('click', resetToUpload);
-    downloadBtn.addEventListener('click', downloadResults);
+    clearFilesBtn.addEventListener('click', clearAllFiles);
+    processFilesBtn.addEventListener('click', startBatchProcessing);
+    newBatchBtn.addEventListener('click', resetToUpload);
+    exportExcelBtn.addEventListener('click', exportToExcel);
     
     // Prevent default drag behaviors
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -60,8 +64,6 @@ function preventDefault(e) {
     e.preventDefault();
     e.stopPropagation();
 }
-
-// Removed complex event handlers - using simple inline handlers instead
 
 function handleDragOver(e) {
     e.preventDefault();
@@ -77,52 +79,91 @@ function handleFileDrop(e) {
     e.preventDefault();
     uploadArea.classList.remove('drag-over');
     
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-        handleFile(files[0]);
-    }
+    const files = Array.from(e.dataTransfer.files);
+    addFiles(files);
 }
 
 function handleFileSelect(e) {
-    const file = e.target.files[0];
-    if (file) {
-        handleFile(file);
-    }
+    const files = Array.from(e.target.files);
+    addFiles(files);
 }
 
-function handleFile(file) {
-    // Validate file type
-    if (file.type !== 'application/pdf') {
-        showError('Please select a PDF file.');
+function addFiles(files) {
+    // Filter PDF files only
+    const pdfFiles = files.filter(file => file.type === 'application/pdf');
+    
+    if (pdfFiles.length !== files.length) {
+        showNotification('Only PDF files are allowed. Some files were skipped.', 'warning');
+    }
+    
+    // Check file size limit (50MB per file)
+    const validFiles = pdfFiles.filter(file => {
+        if (file.size > 50 * 1024 * 1024) {
+            showNotification(`File ${file.name} exceeds 50MB limit and was skipped.`, 'warning');
+            return false;
+        }
+        return true;
+    });
+    
+    // Add new files to selected files (avoid duplicates)
+    validFiles.forEach(file => {
+        if (!selectedFiles.some(f => f.name === file.name && f.size === file.size)) {
+            selectedFiles.push(file);
+        }
+    });
+    
+    // Check batch limit
+    if (selectedFiles.length > 50) {
+        selectedFiles = selectedFiles.slice(0, 50);
+        showNotification('Maximum 50 files allowed. Extra files were removed.', 'warning');
+    }
+    
+    updateFileDisplay();
+    fileInput.value = ''; // Reset input
+}
+
+function updateFileDisplay() {
+    if (selectedFiles.length === 0) {
+        fileList.style.display = 'none';
+        uploadArea.querySelector('h3').textContent = 'Drop multiple invoice PDFs here';
+        uploadArea.querySelector('p').innerHTML = 'or <span class="browse-text" id="browseBtn">browse to choose files</span>';
         return;
     }
     
-    // Validate file size (50MB limit)
-    const maxSize = 50 * 1024 * 1024; // 50MB in bytes
-    if (file.size > maxSize) {
-        showError('File size exceeds 50MB limit.');
-        return;
-    }
+    // Update upload area
+    uploadArea.querySelector('h3').textContent = `${selectedFiles.length} PDF(s) selected`;
+    uploadArea.querySelector('p').textContent = 'Click to add more files or process the selected ones';
     
-    currentFile = file;
-    updateUploadArea(file);
+    // Show file list
+    fileList.style.display = 'block';
     
-    // Auto-start processing after a short delay
-    setTimeout(() => {
-        startProcessing();
-    }, 1000);
+    // Populate file items
+    fileItems.innerHTML = '';
+    selectedFiles.forEach((file, index) => {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-item';
+        fileItem.innerHTML = `
+            <div class="file-info">
+                <i class="fas fa-file-pdf"></i>
+                <span class="file-name">${file.name}</span>
+                <span class="file-size">${formatFileSize(file.size)}</span>
+            </div>
+            <button class="remove-file-btn" onclick="removeFile(${index})" title="Remove file">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        fileItems.appendChild(fileItem);
+    });
 }
 
-function updateUploadArea(file) {
-    const uploadIcon = uploadArea.querySelector('.upload-icon i');
-    const heading = uploadArea.querySelector('h3');
-    const description = uploadArea.querySelector('p');
-    
-    uploadIcon.className = 'fas fa-file-pdf';
-    heading.textContent = file.name;
-    description.innerHTML = `File size: ${formatFileSize(file.size)} | Ready to process`;
-    
-    uploadArea.parentElement.classList.add('file-selected');
+function removeFile(index) {
+    selectedFiles.splice(index, 1);
+    updateFileDisplay();
+}
+
+function clearAllFiles() {
+    selectedFiles = [];
+    updateFileDisplay();
 }
 
 function formatFileSize(bytes) {
@@ -133,226 +174,215 @@ function formatFileSize(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-function showError(message) {
-    const uploadIcon = uploadArea.querySelector('.upload-icon i');
-    const heading = uploadArea.querySelector('h3');
-    const description = uploadArea.querySelector('p');
-    
-    uploadIcon.className = 'fas fa-exclamation-triangle';
-    heading.textContent = 'Error';
-    description.textContent = message;
-    
-    uploadArea.parentElement.classList.add('upload-error');
-    
-    // Reset after 3 seconds
-    setTimeout(resetUploadArea, 3000);
-}
-
-function resetUploadArea() {
-    const uploadIcon = uploadArea.querySelector('.upload-icon i');
-    const heading = uploadArea.querySelector('h3');
-    const description = uploadArea.querySelector('p');
-    
-    uploadIcon.className = 'fas fa-cloud-upload-alt';
-    heading.textContent = 'Drop your PDF here';
-    description.innerHTML = 'or <span class="browse-text" id="browseBtn">browse to choose a file</span>';
-    
-    uploadArea.parentElement.classList.remove('file-selected', 'upload-error');
-    
-    // Re-attach browse button event
-    const newBrowseBtn = document.getElementById('browseBtn');
-    if (newBrowseBtn) {
-        newBrowseBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            fileInput.click();
-        });
+async function startBatchProcessing() {
+    if (selectedFiles.length === 0) {
+        showNotification('Please select at least one PDF file.', 'error');
+        return;
     }
-}
-
-function startProcessing() {
-    if (!currentFile) return;
     
     // Hide upload section and show processing
     uploadSection.style.display = 'none';
     processingSection.style.display = 'block';
     
-    // Get extraction type
-    const extractionType = document.querySelector('input[name="extractionType"]:checked').value;
+    // Update processing UI
+    document.getElementById('totalCount').textContent = selectedFiles.length;
+    document.getElementById('processedCount').textContent = '0';
     
-    // Simulate processing steps
-    processFile(currentFile, extractionType);
-}
-
-async function processFile(file, extractionType) {
     try {
-        // Step 1: Upload (simulate)
-        updateProcessingStep(1, 25);
-        await delay(1000);
-        
-        // Step 2: Analyzing
-        updateProcessingStep(2, 50);
-        await delay(1500);
-        
-        // Step 3: AI Processing
-        updateProcessingStep(3, 75);
-        
-        // Create FormData for file upload
+        // Create FormData for batch upload
         const formData = new FormData();
-        formData.append('file', file);
-        formData.append('extraction_type', extractionType);
+        selectedFiles.forEach(file => {
+            formData.append('files', file);
+        });
         
-        // Make API call to backend
-        const response = await fetch('/api/v1/extract', {
+        // Show progress
+        updateProgress(10);
+        
+        // Send batch request
+        const response = await fetch('/api/v1/batch-extract', {
             method: 'POST',
             body: formData
         });
+        
+        updateProgress(90);
         
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         
-        const results = await response.json();
+        const data = await response.json();
+        updateProgress(100);
         
-        // Step 4: Complete
-        updateProcessingStep(4, 100);
-        await delay(500);
+        // Store processed data
+        processedData = data;
         
-        // Show results
-        showResults(results);
+        // Show results after short delay
+        setTimeout(() => {
+            showResults(data);
+        }, 1000);
         
     } catch (error) {
-        console.error('Processing error:', error);
-        
-        // For demo purposes, show mock results if API fails
-        await delay(1000);
-        updateProcessingStep(4, 100);
-        await delay(500);
-        showMockResults(extractionType);
+        console.error('Batch processing error:', error);
+        showError('Failed to process files: ' + error.message);
     }
 }
 
-function updateProcessingStep(stepNumber, progress) {
-    // Update progress bar
-    progressFill.style.width = `${progress}%`;
-    
-    // Update step indicators
-    for (let i = 1; i <= 4; i++) {
-        const step = document.getElementById(`step${i}`);
-        if (i <= stepNumber) {
-            step.classList.add('active');
-        } else {
-            step.classList.remove('active');
-        }
-    }
+function updateProgress(percentage) {
+    const progressFill = document.getElementById('progressFill');
+    progressFill.style.width = percentage + '%';
 }
 
-function showResults(results) {
-    extractionResults = results;
-    
+function showResults(data) {
     // Hide processing and show results
     processingSection.style.display = 'none';
     resultsSection.style.display = 'block';
     
-    // Populate results tabs
-    populateResultsData(results);
-}
-
-function showMockResults(extractionType) {
-    const mockResults = generateMockResults(extractionType);
-    showResults(mockResults);
-}
-
-function generateMockResults(extractionType) {
-    const baseResults = {
-        filename: currentFile.name,
-        file_size: currentFile.size,
-        extraction_type: extractionType,
-        processing_time: "2.3 seconds",
-        timestamp: new Date().toISOString()
-    };
+    // Update stats
+    updateResultsStats(data);
     
-    switch (extractionType) {
-        case 'invoice':
-            return {
-                ...baseResults,
-                structured_data: {
-                    invoice_number: "INV-2024-001",
-                    date: "2024-01-15",
-                    due_date: "2024-02-15",
-                    vendor: "Tech Solutions Inc.",
-                    total_amount: "$2,450.00",
-                    tax_amount: "$245.00",
-                    subtotal: "$2,205.00",
-                    items: [
-                        { description: "Web Development", quantity: 1, rate: "$1,500.00", amount: "$1,500.00" },
-                        { description: "Design Services", quantity: 1, rate: "$705.00", amount: "$705.00" }
-                    ]
-                },
-                raw_text: "INVOICE\nInvoice Number: INV-2024-001\nDate: January 15, 2024\nDue Date: February 15, 2024\n\nBill To:\nABC Company\n123 Business St\nCity, State 12345\n\nFrom:\nTech Solutions Inc.\n456 Tech Ave\nTech City, TC 67890\n\nServices:\nWeb Development - $1,500.00\nDesign Services - $705.00\n\nSubtotal: $2,205.00\nTax (10%): $245.00\nTotal: $2,450.00",
-                ai_summary: "This is an invoice from Tech Solutions Inc. to ABC Company for web development and design services totaling $2,450.00. The invoice is dated January 15, 2024, with a due date of February 15, 2024."
-            };
+    // Populate tables
+    populateInvoiceSummaryTable(data.invoices);
+    populateLineItemsTable(data.invoices);
+    showProcessingErrors(data.invoices);
+}
+
+function updateResultsStats(data) {
+    const invoices = data.invoices || [];
+    const successfulInvoices = invoices.filter(inv => !inv.error);
+    
+    document.getElementById('processedFilesCount').textContent = invoices.length;
+    document.getElementById('totalInvoicesCount').textContent = successfulInvoices.length;
+    
+    // Calculate total amount
+    let totalAmount = 0;
+    successfulInvoices.forEach(invoice => {
+        if (invoice.invoice_summary && invoice.invoice_summary.total_amount) {
+            totalAmount += parseFloat(invoice.invoice_summary.total_amount) || 0;
+        }
+    });
+    
+    document.getElementById('totalAmountSum').textContent = `$${totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+}
+
+function populateInvoiceSummaryTable(invoices) {
+    const tbody = document.getElementById('summaryTableBody');
+    tbody.innerHTML = '';
+    
+    invoices.forEach(invoice => {
+        if (invoice.error) return; // Skip error records for summary table
+        
+        const summary = invoice.invoice_summary || {};
+        const row = document.createElement('tr');
+        
+        row.innerHTML = `
+            <td>${summary.filename || 'N/A'}</td>
+            <td>${summary.invoice_number || 'N/A'}</td>
+            <td>${summary.vendor_name || 'N/A'}</td>
+            <td>${summary.invoice_date || 'N/A'}</td>
+            <td>${summary.due_date || 'N/A'}</td>
+            <td>$${(summary.total_amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+            <td>${summary.po_number || 'N/A'}</td>
+            <td><span class="status-badge success">Processed</span></td>
+        `;
+        
+        tbody.appendChild(row);
+    });
+}
+
+function populateLineItemsTable(invoices) {
+    const tbody = document.getElementById('lineItemsTableBody');
+    tbody.innerHTML = '';
+    
+    invoices.forEach(invoice => {
+        if (invoice.error || !invoice.line_items) return;
+        
+        const summary = invoice.invoice_summary || {};
+        
+        invoice.line_items.forEach(item => {
+            const row = document.createElement('tr');
             
-        case 'contract':
-            return {
-                ...baseResults,
-                structured_data: {
-                    contract_type: "Service Agreement",
-                    parties: {
-                        party_a: "ABC Corporation",
-                        party_b: "XYZ Services LLC"
-                    },
-                    effective_date: "2024-01-01",
-                    expiration_date: "2024-12-31",
-                    contract_value: "$120,000",
-                    key_terms: [
-                        "Monthly service fee of $10,000",
-                        "30-day termination notice required",
-                        "Confidentiality clause included"
-                    ],
-                    governing_law: "State of California"
-                },
-                raw_text: "SERVICE AGREEMENT\n\nThis Service Agreement (\"Agreement\") is entered into on January 1, 2024, between ABC Corporation and XYZ Services LLC.\n\nTerm: This agreement shall be effective from January 1, 2024, through December 31, 2024.\n\nServices: XYZ Services LLC shall provide consulting services as detailed in Exhibit A.\n\nCompensation: ABC Corporation shall pay $10,000 monthly for services rendered.\n\nTermination: Either party may terminate with 30 days written notice.",
-                ai_summary: "This is a service agreement between ABC Corporation and XYZ Services LLC for consulting services. The contract runs from January 1, 2024, to December 31, 2024, with monthly payments of $10,000. Either party can terminate with 30 days notice."
-            };
+            row.innerHTML = `
+                <td>${summary.invoice_number || 'N/A'}</td>
+                <td>${summary.vendor_name || 'N/A'}</td>
+                <td>${item.item_description || 'N/A'}</td>
+                <td>${item.category || 'N/A'}</td>
+                <td>${item.quantity || 0}</td>
+                <td>$${(item.unit_price || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                <td>$${(item.line_total || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+            `;
             
-        default: // general
-            return {
-                ...baseResults,
-                structured_data: {
-                    document_type: "General Document",
-                    page_count: 5,
-                    word_count: 1247,
-                    key_sections: [
-                        "Introduction",
-                        "Main Content", 
-                        "Conclusion"
-                    ],
-                    extracted_entities: {
-                        dates: ["2024-01-15", "2024-02-01"],
-                        amounts: ["$1,000", "$2,500"],
-                        emails: ["contact@example.com"],
-                        phones: ["+1-555-0123"]
-                    }
-                },
-                raw_text: "This is a sample document containing various types of information. The document discusses important topics and includes relevant data points such as dates, amounts, and contact information. Key dates mentioned include January 15, 2024, and February 1, 2024. Financial figures referenced are $1,000 and $2,500. For more information, contact us at contact@example.com or call +1-555-0123.",
-                ai_summary: "This document contains general information with key data points including dates (January 15, 2024, and February 1, 2024), financial amounts ($1,000 and $2,500), and contact details. The document appears to be informational in nature."
-            };
+            tbody.appendChild(row);
+        });
+    });
+}
+
+function showProcessingErrors(invoices) {
+    const errorList = document.getElementById('errorList');
+    errorList.innerHTML = '';
+    
+    const errorInvoices = invoices.filter(inv => inv.error);
+    
+    if (errorInvoices.length === 0) {
+        errorList.innerHTML = '<div class="no-errors">✅ All files processed successfully!</div>';
+        return;
     }
+    
+    errorInvoices.forEach(invoice => {
+        const errorItem = document.createElement('div');
+        errorItem.className = 'error-item';
+        errorItem.innerHTML = `
+            <div class="error-header">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>Processing Error</span>
+            </div>
+            <div class="error-message">${invoice.error}</div>
+        `;
+        errorList.appendChild(errorItem);
+    });
 }
 
-function populateResultsData(results) {
-    // Structured data tab
-    const structuredData = document.getElementById('structuredData');
-    structuredData.innerHTML = `<pre>${JSON.stringify(results.structured_data, null, 2)}</pre>`;
+async function exportToExcel() {
+    if (!processedData) {
+        showNotification('No data to export', 'error');
+        return;
+    }
     
-    // Raw text tab  
-    const rawText = document.getElementById('rawText');
-    rawText.innerHTML = `<pre>${results.raw_text}</pre>`;
-    
-    // AI summary tab
-    const aiSummary = document.getElementById('aiSummary');
-    aiSummary.innerHTML = `<div style="font-family: 'Inter', sans-serif; line-height: 1.8; font-size: 16px;">${results.ai_summary}</div>`;
+    try {
+        exportExcelBtn.disabled = true;
+        exportExcelBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating Excel...';
+        
+        const response = await fetch('/api/v1/export-excel', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(processedData)
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Export failed: ${response.status}`);
+        }
+        
+        // Download the Excel file
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = response.headers.get('Content-Disposition')?.split('filename=')[1] || 'invoice_batch.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        showNotification('Excel file downloaded successfully!', 'success');
+        
+    } catch (error) {
+        console.error('Export error:', error);
+        showNotification('Failed to export Excel file: ' + error.message, 'error');
+    } finally {
+        exportExcelBtn.disabled = false;
+        exportExcelBtn.innerHTML = '<i class="fas fa-file-excel"></i> Export to Excel';
+    }
 }
 
 function initializeTabs() {
@@ -361,58 +391,59 @@ function initializeTabs() {
     
     tabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
-            const tabName = btn.dataset.tab;
+            const targetTab = btn.getAttribute('data-tab');
             
             // Remove active class from all tabs and contents
             tabBtns.forEach(b => b.classList.remove('active'));
-            tabContents.forEach(content => content.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
             
             // Add active class to clicked tab and corresponding content
             btn.classList.add('active');
-            document.getElementById(`${tabName}-tab`).classList.add('active');
+            document.getElementById(targetTab + '-tab').classList.add('active');
         });
     });
 }
 
 function resetToUpload() {
-    // Reset global state
-    currentFile = null;
-    extractionResults = null;
-    fileInput.value = '';
+    selectedFiles = [];
+    processedData = null;
     
     // Reset UI
-    resetUploadArea();
-    
-    // Show upload section, hide others
-    uploadSection.style.display = 'block';
-    processingSection.style.display = 'none';
     resultsSection.style.display = 'none';
+    uploadSection.style.display = 'block';
+    updateFileDisplay();
     
-    // Reset processing indicators
-    progressFill.style.width = '0%';
-    for (let i = 1; i <= 4; i++) {
-        document.getElementById(`step${i}`).classList.remove('active');
-    }
-    document.getElementById('step1').classList.add('active');
+    // Reset progress
+    updateProgress(0);
 }
 
-function downloadResults() {
-    if (!extractionResults) return;
-    
-    const dataStr = JSON.stringify(extractionResults, null, 2);
-    const dataBlob = new Blob([dataStr], {type: 'application/json'});
-    const url = URL.createObjectURL(dataBlob);
-    
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${currentFile.name.replace('.pdf', '')}_extraction_results.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    URL.revokeObjectURL(url);
+function showError(message) {
+    processingSection.style.display = 'none';
+    uploadSection.style.display = 'block';
+    showNotification(message, 'error');
 }
 
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+function showNotification(message, type = 'info') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.innerHTML = `
+        <div class="notification-content">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+            <span>${message}</span>
+        </div>
+        <button class="notification-close" onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    // Add to page
+    document.body.appendChild(notification);
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.remove();
+        }
+    }, 5000);
 } 

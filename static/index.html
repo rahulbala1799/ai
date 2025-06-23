@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI PDF Data Extraction</title>
+    <title>Batch Invoice Processing - AI PDF Extractor</title>
     <link rel="stylesheet" href="/static/style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -14,12 +14,12 @@
         <header class="header">
             <div class="header-content">
                 <div class="logo">
-                    <i class="fas fa-file-pdf"></i>
-                    <h1>AI PDF Extractor</h1>
+                    <i class="fas fa-file-invoice"></i>
+                    <h1>Batch Invoice Processor</h1>
                 </div>
-                <p class="subtitle">Extract, analyze, and structure data from PDFs using <strong>ChatGPT-3.5</strong></p>
+                <p class="subtitle">Process multiple invoices and export to <strong>Excel</strong> format</p>
                 <div class="ai-status">
-                    <span class="ai-badge">✨ Powered by OpenAI</span>
+                    <span class="ai-badge">✨ Powered by OpenAI GPT-3.5</span>
                 </div>
             </div>
         </header>
@@ -33,43 +33,27 @@
                         <div class="upload-icon">
                             <i class="fas fa-cloud-upload-alt"></i>
                         </div>
-                        <h3>Drop your PDF here</h3>
-                        <p>or <span class="browse-text" id="browseBtn">browse to choose a file</span></p>
-                        <input type="file" id="fileInput" accept=".pdf" hidden>
+                        <h3>Drop multiple invoice PDFs here</h3>
+                        <p>or <span class="browse-text" id="browseBtn">browse to choose files</span></p>
+                        <input type="file" id="fileInput" accept=".pdf" multiple hidden>
                         <div class="file-info">
-                            <small>Maximum file size: 50MB</small>
+                            <small>Upload up to 50 PDFs • Maximum 50MB per file</small>
                         </div>
                     </div>
                     
-                    <div class="upload-options">
-                        <div class="extraction-type">
-                            <h4>Extraction Type</h4>
-                            <div class="radio-group">
-                                <label class="radio-option">
-                                    <input type="radio" name="extractionType" value="general" checked>
-                                    <span class="radio-custom"></span>
-                                    <div>
-                                        <strong>General Extraction</strong>
-                                        <small>Extract all text and basic structure</small>
-                                    </div>
-                                </label>
-                                <label class="radio-option">
-                                    <input type="radio" name="extractionType" value="invoice">
-                                    <span class="radio-custom"></span>
-                                    <div>
-                                        <strong>Invoice Processing</strong>
-                                        <small>Extract invoice details, amounts, dates</small>
-                                    </div>
-                                </label>
-                                <label class="radio-option">
-                                    <input type="radio" name="extractionType" value="contract">
-                                    <span class="radio-custom"></span>
-                                    <div>
-                                        <strong>Contract Analysis</strong>
-                                        <small>Extract key terms, dates, parties</small>
-                                    </div>
-                                </label>
-                            </div>
+                    <!-- File List Display -->
+                    <div class="file-list" id="fileList" style="display: none;">
+                        <h4>Selected Files:</h4>
+                        <div class="file-items" id="fileItems">
+                            <!-- Selected files will appear here -->
+                        </div>
+                        <div class="file-actions">
+                            <button class="btn btn-secondary" id="clearFilesBtn">
+                                <i class="fas fa-trash"></i> Clear All
+                            </button>
+                            <button class="btn btn-primary" id="processFilesBtn">
+                                <i class="fas fa-cogs"></i> Process Invoices
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -81,27 +65,14 @@
                     <div class="processing-animation">
                         <div class="spinner"></div>
                     </div>
-                    <h3>Processing your PDF...</h3>
-                    <p>AI is analyzing and extracting data from your document</p>
+                    <h3>Processing your invoices...</h3>
+                    <p id="processingStatus">AI is analyzing and extracting data from your documents</p>
                     <div class="progress-bar">
                         <div class="progress-fill" id="progressFill"></div>
                     </div>
-                    <div class="processing-steps">
-                        <div class="step active" id="step1">
-                            <i class="fas fa-upload"></i>
-                            <span>Uploading</span>
-                        </div>
-                        <div class="step" id="step2">
-                            <i class="fas fa-search"></i>
-                            <span>Analyzing</span>
-                        </div>
-                        <div class="step" id="step3">
-                            <i class="fas fa-brain"></i>
-                            <span>AI Processing</span>
-                        </div>
-                        <div class="step" id="step4">
-                            <i class="fas fa-check"></i>
-                            <span>Complete</span>
+                    <div class="processing-details">
+                        <div class="processing-count">
+                            <span id="processedCount">0</span> of <span id="totalCount">0</span> files processed
                         </div>
                     </div>
                 </div>
@@ -110,41 +81,87 @@
             <!-- Results Section -->
             <section class="results-section" id="resultsSection" style="display: none;">
                 <div class="results-header">
-                    <h2>Extraction Results</h2>
+                    <h2>Processing Results</h2>
+                    <div class="results-stats">
+                        <div class="stat-item">
+                            <span class="stat-number" id="processedFilesCount">0</span>
+                            <span class="stat-label">Files Processed</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number" id="totalInvoicesCount">0</span>
+                            <span class="stat-label">Invoices</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number" id="totalAmountSum">$0</span>
+                            <span class="stat-label">Total Amount</span>
+                        </div>
+                    </div>
                     <div class="results-actions">
-                        <button class="btn btn-secondary" id="newUploadBtn">
-                            <i class="fas fa-plus"></i>
-                            New Upload
+                        <button class="btn btn-secondary" id="newBatchBtn">
+                            <i class="fas fa-plus"></i> New Batch
                         </button>
-                        <button class="btn btn-primary" id="downloadBtn">
-                            <i class="fas fa-download"></i>
-                            Download JSON
+                        <button class="btn btn-success" id="exportExcelBtn">
+                            <i class="fas fa-file-excel"></i> Export to Excel
                         </button>
                     </div>
                 </div>
 
                 <div class="results-content">
                     <div class="results-tabs">
-                        <button class="tab-btn active" data-tab="structured">Structured Data</button>
-                        <button class="tab-btn" data-tab="raw">Raw Text</button>
-                        <button class="tab-btn" data-tab="summary">AI Summary</button>
+                        <button class="tab-btn active" data-tab="summary">Invoice Summary</button>
+                        <button class="tab-btn" data-tab="lineitems">Line Items</button>
+                        <button class="tab-btn" data-tab="errors">Processing Errors</button>
                     </div>
 
-                    <div class="tab-content active" id="structured-tab">
-                        <div class="structured-data" id="structuredData">
-                            <!-- Results will be populated here -->
+                    <!-- Invoice Summary Table -->
+                    <div class="tab-content active" id="summary-tab">
+                        <div class="table-container">
+                            <table class="results-table" id="summaryTable">
+                                <thead>
+                                    <tr>
+                                        <th>File</th>
+                                        <th>Invoice #</th>
+                                        <th>Vendor</th>
+                                        <th>Date</th>
+                                        <th>Due Date</th>
+                                        <th>Amount</th>
+                                        <th>PO Number</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="summaryTableBody">
+                                    <!-- Results will be populated here -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
-                    <div class="tab-content" id="raw-tab">
-                        <div class="raw-text" id="rawText">
-                            <!-- Raw text will be populated here -->
+                    <!-- Line Items Table -->
+                    <div class="tab-content" id="lineitems-tab">
+                        <div class="table-container">
+                            <table class="results-table" id="lineItemsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Invoice #</th>
+                                        <th>Vendor</th>
+                                        <th>Item Description</th>
+                                        <th>Category</th>
+                                        <th>Quantity</th>
+                                        <th>Unit Price</th>
+                                        <th>Line Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="lineItemsTableBody">
+                                    <!-- Line items will be populated here -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
-                    <div class="tab-content" id="summary-tab">
-                        <div class="ai-summary" id="aiSummary">
-                            <!-- AI summary will be populated here -->
+                    <!-- Processing Errors -->
+                    <div class="tab-content" id="errors-tab">
+                        <div class="error-list" id="errorList">
+                            <!-- Errors will be shown here -->
                         </div>
                     </div>
                 </div>
@@ -153,7 +170,7 @@
 
         <!-- Footer -->
         <footer class="footer">
-            <p>&copy; 2024 AI PDF Extractor. Powered by OpenAI and FastAPI.</p>
+            <p>&copy; 2024 Batch Invoice Processor. Powered by OpenAI and FastAPI.</p>
         </footer>
     </div>
 
